@@ -37,6 +37,13 @@ do{\
 
 #define da_init(type) malloc(256 * sizeof(type))
 
+#define da_free(da)\
+do{\
+    da.count = 0;\
+    da.capaticy = 0;\
+    free(da.items);\
+} while(0)
+
 #define layerMax(net, i) (((i) == (net).layerIndexes.count - 1) ? ((net).neurons.count - 1) : ((net).layerIndexes.items[(i) + 1] - 1))
 
 #define layerStartP(net, i) (net->layerIndexes.items[i])
@@ -88,6 +95,12 @@ typedef struct{
 } layerIndexes;
 
 typedef struct{
+    int* items;
+    int count;
+    int capaticy;
+} numbers;
+
+typedef struct{
     float* items;
     int count;
     int capaticy;
@@ -126,7 +139,6 @@ typedef struct{
 
 
 void GenerateTrainingData(trainingData *tData, int tDataCount){
-    //trainingData tData = da_init(dataSample);
     float i1;
     float i2;
     float r;
@@ -177,21 +189,22 @@ void createRandomNeurons(neuralNetwork *nn, int nCount, float minBias, float max
     }
 }
 
-void GenerateRandomNeuralNetwork(neuralNetwork *nn){
+void GenerateRandomNeuralNetwork(neuralNetwork *nn, numbers layerSizes){
+    assert(layerSizes.count >= 3 && "SAI supports only networks with at least 3 layers");
+    
     //input layer
     da_append(nn->layerIndexes, nn->neurons.count);
-    createRandomNeurons(nn, 2, 0.0f, 0.0f, af_none);
+    createRandomNeurons(nn, layerSizes.items[0], 0.0f, 0.0f, af_none);
 
     //inner layers
-    da_append(nn->layerIndexes, nn->neurons.count);
-    createRandomNeurons(nn, 3, 0.0f, 1.0f, af_ReLu);
-    
-    da_append(nn->layerIndexes, nn->neurons.count);
-    createRandomNeurons(nn, 2, 0.0f, 1.0f, af_ReLu);
-    
+    for(int i = 1; i < layerSizes.count - 1; i++){
+        da_append(nn->layerIndexes, nn->neurons.count);
+        createRandomNeurons(nn, layerSizes.items[i], 0.0f, 0.0f, af_ReLu);
+    }
+
     //output layer
     da_append(nn->layerIndexes, nn->neurons.count);
-    createRandomNeurons(nn, 1, 0.0f, 0.0f, af_sigmoid);
+    createRandomNeurons(nn, layerSizes.items[layerSizes.count - 1], 0.0f, 1.0f, af_sigmoid);
 
     //weight construction
     for(int i = 1; i < nn->layerIndexes.count; i++){
@@ -373,8 +386,16 @@ int main(int argc, char* argv[]){
     printf("Generated %d data samples\n", tData.count);
 
     printf("Generating random neural network\n");
-    neuralNetwork nn = {.neurons = da_init(neuron), .layerIndexes = da_init(int), .weights = da_init(float)};
-    GenerateRandomNeuralNetwork(&nn);
+    neuralNetwork nn = {0};
+    
+    numbers layers = {0};
+    da_append(layers, 2);
+    da_append(layers, 10);
+    da_append(layers, 5);
+    da_append(layers, 10);
+    da_append(layers, 1);
+    
+    GenerateRandomNeuralNetwork(&nn, layers);
     printf("Original neural network: \n");
     neuralNetworkForward(&nn, (dataSample){.input1 = 0.0f, .input2 = 0.0f, .target = 0.0f});
     neuralNetworkPrint(&nn);
@@ -398,6 +419,15 @@ int main(int argc, char* argv[]){
 
     printf("\n--- Interactive mode ---\n");
     neuralNetworkInteractive(&nn);
+
+    da_free(tData);
+
+    da_free(layers);
+
+    da_free(nn.neurons);
+    da_free(nn.layerIndexes);
+    da_free(nn.weights);
+    da_free(nn.weightGradients);
 
     return 0;
 }
