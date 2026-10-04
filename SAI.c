@@ -65,7 +65,7 @@ void GenerateRandomNeuralNetwork(neuralNetwork *nn, numbers layerSizes){
             int layerMaxPrev = layerMaxP(nn, i - 1);
             nn->neurons.items[j].wIndexStart = nn->weights.count;
             for(int k = nn->layerIndexes.items[i - 1]; k <= layerMaxPrev; k++){
-                    printf("Connection - Layer(%d:%d) -> Layer(%d:%d)\n", i - 1, k, i, j);
+                    //printf("Connection - Layer(%d:%d) -> Layer(%d:%d)\n", i - 1, k, i, j);
                     da_append(nn->weights, randf(-0.5f, 0.5f));
             }
         }
@@ -167,12 +167,15 @@ void neuralNetworkUpdate(neuralNetwork *nn, float learningRate){
 
 void neuralNetworkTrain(neuralNetwork *nn, trainingData *tData, int numEpochs, float learningRate){
     for(int epoch = 0; epoch < numEpochs; epoch++){
+        float totalLoss = 0;
         for(int sample = 0; sample < tData->testDataStart; sample++){
             neuralNetworkForward(nn, tData->items[sample].inputs);
             neuralNetworkCalculateGradients(nn, tData->items[sample].targets);
+            totalLoss += nn->loss;
             neuralNetworkBackward(nn);
             neuralNetworkUpdate(nn, learningRate);
         }
+        printf("Epoch %d/%d, average loss: %f\n", epoch + 1, numEpochs, totalLoss/tData->testDataStart);
     }
 }
 

@@ -108,9 +108,6 @@ typedef struct {
     Training data
 */
 
-/*
-    Layer helpers
-*/
 
 typedef struct{
     numbersf inputs;
@@ -123,9 +120,13 @@ typedef struct{
     dataSample* items;
     int count;
     int capaticy;
-
+    
     int testDataStart;
 } trainingData;
+
+/*
+    Layer helpers
+*/
 
 #define layerMax(net, i) \
     (((i) == (net).layerIndexes.count - 1) \
