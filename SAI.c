@@ -5,8 +5,47 @@
 #include <time.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 
 #define randf(min, max) ((min) + ((float)rand() / (float)RAND_MAX) * ((max) - (min)))
+
+#define MAX_ITEMS 100
+typedef struct {
+    int key;
+    int value;
+} DictEntry;
+
+typedef struct {
+    DictEntry items[MAX_ITEMS];
+    int size;
+} Dictionary;
+
+void dict_insert(Dictionary *dict, int key, int value) {
+    for (int i = 0; i < dict->size; i++) {
+        if (dict->items[i].key == key) {
+            dict->items[i].value = value; // Update value
+            return;
+        }
+    }
+    // Add new item if room exists
+    if (dict->size < MAX_ITEMS) {
+        dict->items[dict->size].key = key;
+        dict->items[dict->size].value = value;
+        dict->size++;
+    } else {
+        printf("Dictionary is full!\n");
+    }
+}
+
+// Function to find a value by key
+int dict_get(Dictionary *dict, int key, int default_val) {
+    for (int i = 0; i < dict->size; i++) {
+        if (dict->items[i].key == key) {
+            return dict->items[i].value;
+        }
+    }
+    return default_val;
+}
 
 float relu(float v){
     return v > 0.0f ? v : 0.0f;
@@ -14,6 +53,10 @@ float relu(float v){
 
 float sigmoid(float v){
     return 1.0f / (1.0f + expf(-v));
+}
+
+float clamp01(float v){
+    return v >= 0.5 ? 1.0f : 0.0f;
 }
 
 float activate(neuron* n){
@@ -26,6 +69,9 @@ float activate(neuron* n){
             break;
         case af_none:
             return n->value;
+            break;
+        case af_clamp01:
+            return clamp01(n->value);
             break;
         default:
             assert(false && "Unknown activation function type " && n->aF);
@@ -192,6 +238,52 @@ int neuralNetworkTest(neuralNetwork *nn, trainingData *tData){
     return testSamplesPassed;
 }
 
+int findMaxValueIndex(numbersf values){
+    assert(values.count > 0);
+
+    int maxIndex = 0;
+    float maxValue = values.items[0];
+
+    for(int i = 1; i < values.count; i++){
+        if(values.items[i] > maxValue){
+            maxValue = values.items[i];
+            maxIndex = i;
+        }
+    }
+
+    return maxIndex;
+}
+
+testResults neuralNetworkTestMulticlass(neuralNetwork *nn, trainingData *tData){
+    int passed = 0;
+
+    Dictionary totalCases = {0};
+    Dictionary passedCases = {0};
+
+    for(int sample = tData->testDataStart; sample < tData->count; sample++){
+        neuralNetworkForward(nn, tData->items[sample].inputs);
+
+        int predictedClass = findMaxValueIndex(nn->predictions);
+        int targetClass = findMaxValueIndex(tData->items[sample].targets);
+
+        dict_insert(&totalCases, targetClass, dict_get(&totalCases, targetClass, 0) + 1);
+
+        if(predictedClass == targetClass){
+            passed++;
+            dict_insert(&passedCases, targetClass, dict_get(&passedCases, targetClass, 0) + 1);
+        }
+    }
+    testResults results = {0};
+    results.testSamplesPassed = passed;
+    //printf("%d := %d", passedCases.items[0].key, passedCases.items[0].value);
+    for(int caseT = 0; caseT < totalCases.size; caseT++){
+        int caseC = totalCases.items[caseT].key;
+        float passedP = (float)dict_get(&passedCases, caseC, -1)/(float)dict_get(&totalCases, caseC, -1);
+        da_append(results.confusingMatrix, passedP);
+    }
+
+    return results;
+}
 
 void neuralNetworkPrint(neuralNetwork *nn){
     printf("Neural network: \n");

@@ -1,10 +1,16 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "SAI.h"
+#include "drawingGUI.h"
 
 #include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 uint32_t readBigEndianUInt32(FILE *file)
 {
@@ -177,7 +183,84 @@ void readTrainingData(trainingData *tData, const char *imagesPath, const char *l
     printf("Training samples: %d\n", tData->count);
 }
 
+void numbersGuiPredict(const float *input, int inputCount, float *outputs, int outputCount, void *userData){
+    neuralNetwork *nn = (neuralNetwork *)userData;
+
+    numbersf networkInput = {
+        .items = (float *)input,
+        .count = inputCount,
+        .capaticy = inputCount
+    };
+
+    neuralNetworkForward(nn, networkInput);
+
+    int copyCount = nn->predictions.count;
+
+    if(copyCount > outputCount) copyCount = outputCount;
+
+    for(int i = 0; i < copyCount; i++){
+        outputs[i] = nn->predictions.items[i];
+    }
+
+    for(int i = copyCount; i < outputCount; i++){
+        outputs[i] = 0.0f;
+    }
+}
+
+void numbersGuiPrepareInput(const float *canvas, int canvasWidth, int canvasHeight, float *input, int inputCount, void *userData){
+    (void)userData;
+
+    int pixelCount = canvasWidth * canvasHeight;
+
+    assert(pixelCount == inputCount);
+
+    float mass = 0.0f;
+    float centerX = 0.0f;
+    float centerY = 0.0f;
+
+    for(int y = 0; y < canvasHeight; y++){
+        for(int x = 0; x < canvasWidth; x++){
+            float value = canvas[y * canvasWidth + x];
+
+            mass += value;
+
+            centerX += value * ((float)x + 0.5f);
+            centerY += value * ((float)y + 0.5f);
+        }
+    }
+
+    memset(input, 0, inputCount * sizeof(float));
+
+    if(mass <= 0.00001f) return;
+
+    centerX /= mass;
+    centerY /= mass;
+
+    float desiredCenterX = (float)canvasWidth * 0.5f;
+    float desiredCenterY = (float)canvasHeight * 0.5f;
+
+    int offsetX = (int)roundf(desiredCenterX - centerX);
+    int offsetY = (int)roundf(desiredCenterY - centerY);
+
+    for(int y = 0; y < canvasHeight; y++){
+        for(int x = 0; x < canvasWidth; x++){
+            int targetX = x + offsetX;
+            int targetY = y + offsetY;
+
+            if(targetX < 0 || targetX >= canvasWidth) continue;
+            if(targetY < 0 || targetY >= canvasHeight) continue;
+
+            input[targetY * canvasWidth + targetX] = canvas[y * canvasWidth + x];
+        }
+    }
+}
+
+
 int main(int argc, char* argv[]){
+    (void)argc;
+    (void)argv;
+    
+    const char *digitLabels[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
     float learningRate = 0.01f;
     int numEpochs = 10;
 
@@ -220,14 +303,42 @@ int main(int argc, char* argv[]){
 
     //Test
     int totalTestSamples = tData.count - tData.testDataStart;
-    int testSamplesPassed = neuralNetworkTest(&nn, &tData);
+    testResults results  = neuralNetworkTestMulticlass(&nn, &tData);
 
     double elapsedTime = (double)(end - start) / CLOCKS_PER_SEC;
-    float accuracy = 100.0f * (float)testSamplesPassed / (float)totalTestSamples;
+    float accuracy = 100.0f * (float)results.testSamplesPassed / (float)totalTestSamples;
 
     printf("Neural network after %d training steps: \n", numEpochs * tData.testDataStart);
     printf("Training time: %.6f seconds\n", elapsedTime);
     printf("Test accuracy: %.2f%%\n", accuracy);
+    printf("Confusion matrix: \n");
+    for(int i = 0; i < results.confusingMatrix.count; i++){
+        printf("%s = %f passed\n", digitLabels[i], results.confusingMatrix.items[i]);
+    }
     
-    neuralNetworkForward(&nn, zeroedInputs);
+
+    DrawingGUIConfig gui = {
+        .title = "SAI - MNIST",
+        .canvasWidth = 28,
+        .canvasHeight = 28,
+        .cellSize = 18,
+
+        .inputCount = 784,
+        .outputCount = 10,
+
+        .brushRadius = 1.7f,
+
+        .autoPredict = true,
+
+        .outputLabels = digitLabels,
+
+        .prepareInput = numbersGuiPrepareInput,
+        .predict = numbersGuiPredict,
+
+        .userData = &nn
+    };
+
+    DrawingGUI_Run(&gui);
+
+    return 1;
 }

@@ -52,7 +52,8 @@ do { \
 typedef enum {
     af_none,
     af_ReLu,
-    af_sigmoid
+    af_sigmoid,
+    af_clamp01
 } activationFunction;
 
 /*
@@ -123,6 +124,11 @@ typedef struct{
     
     int testDataStart;
 } trainingData;
+
+typedef struct{
+    numbersf confusingMatrix;
+    int testSamplesPassed;
+} testResults;
 
 /*
     Layer helpers
@@ -195,6 +201,8 @@ void neuralNetworkUpdate(
 
 void neuralNetworkTrain(neuralNetwork *nn, trainingData *tData, int numEpochs, float learningRate);
 int neuralNetworkTest(neuralNetwork *nn, trainingData *tData);
+int findMaxValueIndex(numbersf values);
+testResults neuralNetworkTestMulticlass(neuralNetwork *nn, trainingData *tData);
 
 /*
     Debugging / statistics
