@@ -105,8 +105,27 @@ typedef struct {
 } neuralNetwork;
 
 /*
+    Training data
+*/
+
+/*
     Layer helpers
 */
+
+typedef struct{
+    numbersf inputs;
+    numbersf targets;
+} dataSample;
+
+typedef struct{
+    //TODO: remove dataSample because storing two big da instead of
+    //billion small ones is better for cache locality
+    dataSample* items;
+    int count;
+    int capaticy;
+
+    int testDataStart;
+} trainingData;
 
 #define layerMax(net, i) \
     (((i) == (net).layerIndexes.count - 1) \
@@ -168,6 +187,13 @@ void neuralNetworkUpdate(
     neuralNetwork *nn,
     float learningRate
 );
+
+/*
+    Training / testing
+*/
+
+void neuralNetworkTrain(neuralNetwork *nn, trainingData *tData, int numEpochs, float learningRate);
+int neuralNetworkTest(neuralNetwork *nn, trainingData *tData);
 
 /*
     Debugging / statistics

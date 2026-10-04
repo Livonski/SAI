@@ -102,6 +102,7 @@ void neuralNetworkForward(neuralNetwork *nn, numbersf inputs){
 }
 
 void neuralNetworkCalculateGradients(neuralNetwork *nn, numbersf targets){
+    assert(targets.count == nn->predictions.count);
     nn->targets.count = 0;
     nn->errors.count = 0;
     nn->outputGradients.count = 0;
@@ -163,6 +164,31 @@ void neuralNetworkUpdate(neuralNetwork *nn, float learningRate){
         nn->weights.items[i] -= nn->weightGradients.items[i] * learningRate;
     }
 }
+
+void neuralNetworkTrain(neuralNetwork *nn, trainingData *tData, int numEpochs, float learningRate){
+    for(int epoch = 0; epoch < numEpochs; epoch++){
+        for(int sample = 0; sample < tData->testDataStart; sample++){
+            neuralNetworkForward(nn, tData->items[sample].inputs);
+            neuralNetworkCalculateGradients(nn, tData->items[sample].targets);
+            neuralNetworkBackward(nn);
+            neuralNetworkUpdate(nn, learningRate);
+        }
+    }
+}
+
+int neuralNetworkTest(neuralNetwork *nn, trainingData *tData){
+    int testSamplesPassed = 0;
+    for(int sample = tData->testDataStart; sample < tData->count; sample++){
+        neuralNetworkForward(nn, tData->items[sample].inputs);
+        int predictedClass = nn->predictions.items[0] >= 0.5f ? 1 : 0;
+        int targetClass = tData->items[sample].targets.items[0] >= 0.5f ? 1 : 0;
+        if(predictedClass == targetClass){
+            testSamplesPassed++;
+        }
+    }
+    return testSamplesPassed;
+}
+
 
 void neuralNetworkPrint(neuralNetwork *nn){
     printf("Neural network: \n");

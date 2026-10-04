@@ -4,22 +4,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef struct{
-    numbersf inputs;
-    numbersf targets;
-} dataSample;
-
-typedef struct{
-    //TODO: remove dataSample because storing two big da instead of
-    //billion small ones is better for cache locality
-    dataSample* items;
-    int count;
-    int capaticy;
-
-    int testDataStart;
-} trainingData;
-
-
 void GenerateTrainingData(trainingData *tData, int tDataCount){
     float i1;
     float i2;
@@ -118,28 +102,12 @@ int main(int argc, char* argv[]){
 
     //Train
     clock_t start = clock();
-    for(int epoch = 0; epoch < numEpochs; epoch++){
-        for(int sample = 0; sample < tData.testDataStart; sample++){
-            neuralNetworkForward(&nn, tData.items[sample].inputs);
-            neuralNetworkCalculateGradients(&nn, tData.items[sample].targets);
-            neuralNetworkBackward(&nn);
-            neuralNetworkUpdate(&nn, learningRate);
-        }
-    }
+    neuralNetworkTrain(&nn, &tData, numEpochs, learningRate);
     clock_t end = clock();
 
     //Test
     int totalTestSamples = tData.count - tData.testDataStart;
-    int testSamplesPassed = 0;
-    for(int sample = tData.testDataStart; sample < tData.count; sample++){
-        neuralNetworkForward(&nn, tData.items[sample].inputs);
-        int predictedClass = nn.predictions.items[0] >= 0.5f ? 1 : 0;
-        int targetClass = tData.items[sample].targets.items[0] >= 0.5f ? 1 : 0;
-
-        if(predictedClass == targetClass){
-            testSamplesPassed++;
-        }
-    }
+    int testSamplesPassed = neuralNetworkTest(&nn, &tData);
 
     double elapsedTime = (double)(end - start) / CLOCKS_PER_SEC;
     float accuracy = 100.0f * (float)testSamplesPassed / (float)totalTestSamples;
